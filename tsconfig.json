@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "jsx": "react-native",
+    "jsxImportSource": "react",
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "extends": "expo/tsconfig.base"
+}

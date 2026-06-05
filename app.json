@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "Chronos DTN",
+    "slug": "chronos-dtn-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "chronos",
+    "userInterfaceStyle": "dark",
+    "assetBundlePatterns": ["**/*"],
+    "ios": { "supportsTablet": false },
+    "android": { "adaptiveIcon": { "backgroundColor": "#0A0E1A" } },
+    "plugins": ["expo-router"],
+    "experiments": { "typedRoutes": true }
+  }
+}

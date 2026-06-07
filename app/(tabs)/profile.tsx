@@ -1,51 +1,102 @@
 // ==========================================================================================
 // TELA DE PERFIL E CONFIGURAÇÕES - TEMA VOID PROTOCOL (CHRONOS DTN MOBILE)
 // GERENCIAMENTO DE CREDENCIAIS JWT, IP DO GATEWAY E SELETOR DE API (JAVA / .NET)
+// PERSISTÊNCIA VIA ASYNC STORAGE — IP E BACKEND SOBREVIVEM AO REINÍCIO DO APP
 // ==========================================================================================
 
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import {
+  StyleSheet, Text, View, ScrollView, TextInput,
+  TouchableOpacity, Alert, ActivityIndicator,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/Colors';
+import {
+  salvarIpGateway,
+  salvarBackend,
+  carregarConfiguracoes,
+} from '../../services/configService';
+import { updateAxiosConfig, getIpAtual, getBackendAtual } from '../../services/axiosService';
 
-// Tipo que representa qual backend está sendo consumido no momento.
+// Tipo do seletor de backend.
 type ApiBackend = 'java' | 'dotnet';
 
-// Componente principal da tela de Perfil e Configurações do operador.
+// Componente principal da tela de Perfil e Configurações.
 export default function ProfileScreen() {
   const [carregando, setCarregando] = useState(true);
-  // Estado do IP do gateway da Terra.
-  const [ipGateway, setIpGateway] = useState('192.168.1.100');
-  // Estado do token JWT de autenticação do operador.
+  // IP do gateway — carregado do AsyncStorage na montagem da tela.
+  const [ipGateway, setIpGateway] = useState(getIpAtual());
+  // Token JWT do operador.
   const [tokenJwt, setTokenJwt] = useState('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...');
-  // Estado do identificador do operador logado.
-  const [operador, setOperador] = useState('lunar-operator-01');
-  // Estado do seletor de backend — Java (porta 8080) ou .NET (porta 5000).
-  const [backendAtivo, setBackendAtivo] = useState<ApiBackend>('java');
+  // Identificador do operador.
+  const [operador] = useState('lunar-operator-01');
+  // Backend selecionado — carregado do AsyncStorage na montagem da tela.
+  const [backendAtivo, setBackendAtivo] = useState<ApiBackend>(getBackendAtual());
+  // Flag de salvamento ativo.
+  const [salvando, setSalvando] = useState(false);
 
-  // Simula o delay de inicialização da tela de configurações.
+  // Carrega as configurações persistidas ao montar a tela.
   useEffect(() => {
-    const timer = setTimeout(() => setCarregando(false), 1280);
-    return () => clearTimeout(timer);
+    const inicializar = async () => {
+      try {
+        const config = await carregarConfiguracoes();
+        // Sincroniza o estado local com o que está salvo no dispositivo.
+        setIpGateway(config.ip);
+        setBackendAtivo(config.backend);
+        // Garante que o Axios já começa com as configurações corretas.
+        updateAxiosConfig(config.ip, config.backend);
+      } catch (erro) {
+        console.error('[PROFILE] Erro ao carregar configurações:', erro);
+      } finally {
+        setCarregando(false);
+      }
+    };
+    inicializar();
   }, []);
 
-  // Persiste as configurações localmente com feedback visual.
-  const gravarDefinicoes = () => {
-    Alert.alert(
-      'Configurações Atualizadas',
-      `API ativa: ${backendAtivo === 'java' ? 'Java :8080' : '.NET :5000'}\nGateway: ${ipGateway}`,
-      [{ text: 'Confirmar' }]
-    );
+  // Persiste as configurações no AsyncStorage E atualiza as instâncias Axios em runtime.
+  const gravarDefinicoes = async () => {
+    if (!ipGateway.trim()) {
+      Alert.alert('Campo obrigatório', 'O endereço IP do gateway não pode estar vazio.');
+      return;
+    }
+    try {
+      setSalvando(true);
+
+      // 1. Persiste no AsyncStorage (sobrevive ao fechar o app).
+      await Promise.all([
+        salvarIpGateway(ipGateway),
+        salvarBackend(backendAtivo),
+      ]);
+
+      // 2. Atualiza as instâncias Axios em runtime (efeito imediato, sem reiniciar o app).
+      updateAxiosConfig(ipGateway, backendAtivo);
+
+      const porta = backendAtivo === 'java' ? '8080' : '5000';
+      Alert.alert(
+        '✅ Configurações Aplicadas',
+        `API ativa: ${backendAtivo === 'java' ? 'Java Spring Boot' : '.NET ASP.NET Core'}\n` +
+        `Endereço: http://${ipGateway}:${porta}/api\n\n` +
+        'Todas as requisições agora usam estas configurações.',
+        [{ text: 'OK' }]
+      );
+    } catch (erro) {
+      Alert.alert('Erro', 'Não foi possível salvar as configurações. Tente novamente.');
+    } finally {
+      setSalvando(false);
+    }
   };
 
   if (carregando) {
     return (
       <View style={styles.containerCentro}>
         <ActivityIndicator size="large" color={COLORS.accent} />
-        <Text style={styles.textoLoading}>Carregando definições de segurança...</Text>
+        <Text style={styles.textoLoading}>Carregando configurações salvas...</Text>
       </View>
     );
   }
+
+  const portaAtiva = backendAtivo === 'java' ? '8080' : '5000';
 
   return (
     <View style={styles.containerPrincipal}>
@@ -65,7 +116,7 @@ export default function ProfileScreen() {
           <Text style={styles.nivelAcesso}>Nível de Acesso: Admin Cislunar</Text>
         </View>
 
-        {/* Seletor de API: Java vs .NET */}
+        {/* Seletor de API: Java vs .NET — agora conectado ao Axios */}
         <View style={styles.cardConfig}>
           <View style={styles.rowHeaderCardDivider}>
             <Ionicons name="server-outline" size={12} color={COLORS.textSecondary} style={styles.iconEspacado} />
@@ -78,7 +129,7 @@ export default function ProfileScreen() {
               onPress={() => setBackendAtivo('java')}
             >
               <Text style={[styles.textoBotaoApi, backendAtivo === 'java' && styles.textoBotaoApiAtivo]}>
-                Java :8080
+                ☕ Java :8080
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -86,16 +137,20 @@ export default function ProfileScreen() {
               onPress={() => setBackendAtivo('dotnet')}
             >
               <Text style={[styles.textoBotaoApi, backendAtivo === 'dotnet' && styles.textoBotaoApiAtivo]}>
-                .NET :5000
+                ⚙️ .NET :5000
               </Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.labelInput}>
-            URL base: {backendAtivo === 'java' ? `http://${ipGateway}:8080/api` : `http://${ipGateway}:5000/api`}
-          </Text>
+          {/* URL base calculada dinamicamente — mostra o que SERÁ aplicado ao salvar */}
+          <View style={styles.urlPreviewBox}>
+            <Text style={styles.urlPreviewLabel}>URL base (após salvar):</Text>
+            <Text style={styles.urlPreviewValue}>
+              http://{ipGateway}:{portaAtiva}/api
+            </Text>
+          </View>
         </View>
 
-        {/* Card de configuração do IP do gateway */}
+        {/* Card de configuração do IP */}
         <View style={styles.cardConfig}>
           <View style={styles.rowHeaderCardDivider}>
             <Ionicons name="wifi-outline" size={12} color={COLORS.textSecondary} style={styles.iconEspacado} />
@@ -108,7 +163,12 @@ export default function ProfileScreen() {
             onChangeText={setIpGateway}
             placeholder="Ex: 192.168.1.100"
             placeholderTextColor="#4b5563"
+            keyboardType="numeric"
+            autoCapitalize="none"
           />
+          <Text style={styles.hintText}>
+            Mesmo IP onde o backend Java/NET está rodando na rede local.
+          </Text>
         </View>
 
         {/* Card de configuração JWT */}
@@ -129,13 +189,19 @@ export default function ProfileScreen() {
           />
         </View>
 
-        {/* Botão de gravação */}
-        <TouchableOpacity style={styles.botaoGravar} onPress={gravarDefinicoes}>
+        {/* Botão de gravação — agora funcional */}
+        <TouchableOpacity style={styles.botaoGravar} onPress={gravarDefinicoes} disabled={salvando}>
           <View style={styles.rowBotaoConteudo}>
-            <Ionicons name="save-outline" size={14} color="#000000" style={styles.iconBotaoEspacado} />
-            <Text style={styles.textoBotaoGravar}>GRAVAR CREDENCIAIS DE REDE</Text>
+            {salvando
+              ? <ActivityIndicator size="small" color="#000000" style={styles.iconBotaoEspacado} />
+              : <Ionicons name="save-outline" size={14} color="#000000" style={styles.iconBotaoEspacado} />
+            }
+            <Text style={styles.textoBotaoGravar}>
+              {salvando ? 'APLICANDO...' : 'GRAVAR E APLICAR AGORA'}
+            </Text>
           </View>
         </TouchableOpacity>
+
       </ScrollView>
     </View>
   );
@@ -178,6 +244,7 @@ const styles = StyleSheet.create({
   },
   tituloCard: { fontSize: 11, fontFamily: 'DMSans-Bold', color: COLORS.textSecondary, letterSpacing: 1 },
   labelInput: { color: COLORS.textSecondary, fontFamily: 'DMSans-Medium', fontSize: 11, marginBottom: 8 },
+  hintText: { color: COLORS.purple, fontFamily: 'DMSans-Regular', fontSize: 10, marginTop: 6 },
   rowSeletorApi: { flexDirection: 'row', gap: 12, marginBottom: 12 },
   botaoApi: {
     flex: 1, paddingVertical: 10, borderRadius: 8,
@@ -187,6 +254,12 @@ const styles = StyleSheet.create({
   botaoApiAtivo: { backgroundColor: COLORS.accent, borderColor: COLORS.accent },
   textoBotaoApi: { color: COLORS.textSecondary, fontFamily: 'DMSans-Bold', fontSize: 12 },
   textoBotaoApiAtivo: { color: '#000000' },
+  urlPreviewBox: {
+    backgroundColor: '#05070d', borderRadius: 8, padding: 10,
+    borderWidth: 1, borderColor: COLORS.border,
+  },
+  urlPreviewLabel: { color: COLORS.purple, fontFamily: 'DMSans-Regular', fontSize: 10, marginBottom: 4 },
+  urlPreviewValue: { color: COLORS.cyan, fontFamily: 'DMSans-Bold', fontSize: 12 },
   input: {
     backgroundColor: '#05070d', color: COLORS.textPrimary, padding: 12,
     borderRadius: 8, borderWidth: 1, borderColor: COLORS.border,

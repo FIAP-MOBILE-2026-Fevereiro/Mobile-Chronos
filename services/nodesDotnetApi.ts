@@ -1,6 +1,7 @@
 // ==========================================================================================
 // SERVICO DE NOS DTN — API .NET (ASP.NET CORE 8 — PORTA 5000)
-// CRUD COMPLETO: CREATE, READ, UPDATE, DELETE DE GATEWAYS CISLUNARES
+// MANTIDO COMO REFERÊNCIA EXPLÍCITA AO BACKEND .NET PARA TESTES DIRETOS
+// PARA USO DINÂMICO (JAVA OU .NET), PREFIRA nodesJavaApi.ts QUE USA getApiAtiva()
 // ==========================================================================================
 
 import { apiDotnet } from './axiosService';
@@ -15,7 +16,7 @@ export interface NoRedeDotnet {
 }
 
 // ========================================================================================
-// READ — Busca todos os nós cadastrados na rede DTN via API .NET.
+// READ — Busca todos os nós cadastrados via API .NET diretamente.
 // ========================================================================================
 export async function buscarNosDotnet(): Promise<NoRedeDotnet[]> {
   const response = await apiDotnet.get<NoRedeDotnet[]>('/nodes');
@@ -39,10 +40,10 @@ export async function criarNoDotnet(novoNo: Omit<NoRedeDotnet, 'id'>): Promise<N
 }
 
 // ========================================================================================
-// UPDATE — Atualiza os dados de um nó existente via API .NET.
+// UPDATE — Atualiza parcialmente um nó existente via PATCH (campos alterados apenas).
 // ========================================================================================
 export async function atualizarNoDotnet(id: number, dadosAtualizados: Partial<NoRedeDotnet>): Promise<NoRedeDotnet> {
-  const response = await apiDotnet.put<NoRedeDotnet>(`/nodes/${id}`, dadosAtualizados);
+  const response = await apiDotnet.patch<NoRedeDotnet>(`/nodes/${id}`, dadosAtualizados);
   return response.data;
 }
 

@@ -1,11 +1,12 @@
 // ==========================================================================================
-// SERVICO DE NOS DTN — API JAVA (SPRING BOOT 3 — PORTA 8080)
-// CRUD COMPLETO: CREATE, READ, UPDATE, DELETE DE GATEWAYS CISLUNARES
+// SERVICO DE NOS DTN — CRUD UNIFICADO (CHRONOS DTN MOBILE)
+// USA getApiAtiva() PARA RESOLVER DINAMICAMENTE QUAL BACKEND ESTÁ ATIVO (JAVA / .NET)
+// SWITCH É FEITO PELA TELA DE PERFIL VIA updateAxiosConfig() — SEM REINICIAR O APP
 // ==========================================================================================
 
-import { apiJava } from './axiosService';
+import { getApiAtiva } from './axiosService';
 
-// Interface da entidade Nó de rede conforme contrato da API Java.
+// Interface da entidade Nó de rede conforme contrato de ambas as APIs.
 export interface NoRede {
   id?: number;
   name: string;
@@ -15,10 +16,11 @@ export interface NoRede {
 }
 
 // ========================================================================================
-// READ — Busca todos os nós cadastrados na rede DTN via API Java.
+// READ — Busca todos os nós cadastrados na rede DTN.
+// Usa a instância ativa (Java :8080 ou .NET :5000) conforme configuração do Perfil.
 // ========================================================================================
 export async function buscarNos(): Promise<NoRede[]> {
-  const response = await apiJava.get<NoRede[]>('/nodes');
+  const response = await getApiAtiva().get<NoRede[]>('/nodes');
   return response.data;
 }
 
@@ -26,30 +28,31 @@ export async function buscarNos(): Promise<NoRede[]> {
 // READ — Busca um nó específico pelo seu identificador único.
 // ========================================================================================
 export async function buscarNoPorId(id: number): Promise<NoRede> {
-  const response = await apiJava.get<NoRede>(`/nodes/${id}`);
+  const response = await getApiAtiva().get<NoRede>(`/nodes/${id}`);
   return response.data;
 }
 
 // ========================================================================================
-// CREATE — Registra um novo nó gateway na rede DTN via API Java.
+// CREATE — Registra um novo nó gateway na rede DTN.
 // ========================================================================================
 export async function criarNo(novoNo: Omit<NoRede, 'id'>): Promise<NoRede> {
-  const response = await apiJava.post<NoRede>('/nodes', novoNo);
+  const response = await getApiAtiva().post<NoRede>('/nodes', novoNo);
   return response.data;
 }
 
 // ========================================================================================
-// UPDATE — Atualiza os dados de um nó existente na rede via API Java.
+// UPDATE — Atualiza parcialmente um nó existente via PATCH (envia apenas os campos alterados).
+// PATCH é mais seguro que PUT para updates parciais: não sobrescreve bufferedPackets etc.
 // ========================================================================================
 export async function atualizarNo(id: number, dadosAtualizados: Partial<NoRede>): Promise<NoRede> {
-  const response = await apiJava.put<NoRede>(`/nodes/${id}`, dadosAtualizados);
+  const response = await getApiAtiva().patch<NoRede>(`/nodes/${id}`, dadosAtualizados);
   return response.data;
 }
 
 // ========================================================================================
-// DELETE — Remove permanentemente um nó da rede DTN via API Java.
-// O interceptor do Axios bloqueia automaticamente se houver buffer pendente.
+// DELETE — Remove permanentemente um nó da rede DTN.
+// O interceptor Axios em axiosService.ts bloqueia automaticamente nós com buffer pendente.
 // ========================================================================================
 export async function deletarNo(id: number): Promise<void> {
-  await apiJava.delete(`/nodes/${id}`);
+  await getApiAtiva().delete(`/nodes/${id}`);
 }

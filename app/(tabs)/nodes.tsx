@@ -1,251 +1,1 @@
-// ==========================================================================================
-// TELA DE GERENCIADOR DE NÓS - TEMA VOID PROTOCOL (CHRONOS DTN MOBILE)
-// CRUD COMPLETO INTEGRADO COM API JAVA (SPRING BOOT) VIA SERVICO nodesJavaApi
-// ==========================================================================================
-
-import React, { useState, useEffect } from 'react';
-import {
-  StyleSheet, Text, View, FlatList, TouchableOpacity,
-  ActivityIndicator, Alert, TextInput, Modal,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../../constants/Colors';
-import { buscarNos, criarNo, atualizarNo, deletarNo, NoRede } from '../../services/nodesJavaApi';
-
-// Componente principal da tela de Gerenciamento de Nós DTN.
-export default function NodesScreen() {
-  const [nos, setNos] = useState<NoRede[]>([]);
-  const [carregando, setCarregando] = useState(true);
-  // Controla a visibilidade do modal de criação/edição.
-  const [modalVisivel, setModalVisivel] = useState(false);
-  // Nó que está sendo editado (null = modo criação).
-  const [noEditando, setNoEditando] = useState<NoRede | null>(null);
-  // Campos do formulário do modal.
-  const [formNome, setFormNome] = useState('');
-  const [formLocalizacao, setFormLocalizacao] = useState('');
-  // Controla loading interno do modal durante operações de escrita.
-  const [salvando, setSalvando] = useState(false);
-
-  useEffect(() => {
-    carregarNos();
-  }, []);
-
-  // READ — Busca a lista de nós da API Java com feedback de carregamento.
-  const carregarNos = async () => {
-    try {
-      setCarregando(true);
-      const lista = await buscarNos();
-      setNos(lista);
-    } catch (erro) {
-      // Feedback visual de erro de conexão com a API.
-      Alert.alert('Erro de Conexão', 'Não foi possível conectar à API Java. Verifique o IP do gateway na tela de Configurações.');
-      // Fallback com dados mockados para demonstração sem servidor.
-      setNos([
-        { id: 1, name: 'Terrestrial-Gateway-01', location: 'EARTH_KSC', bufferedPackets: 0 },
-        { id: 2, name: 'Lunar-Gateway-Alpha', location: 'LUNAR_SOUTH_POLE', bufferedPackets: 0 },
-        { id: 3, name: 'Lunar-Gateway-Beta', location: 'LUNAR_EQUATOR', bufferedPackets: 15 },
-        { id: 4, name: 'Lunar-Orbiter-Satt-1', location: 'LUNAR_ORBIT', bufferedPackets: 0 },
-      ]);
-    } finally {
-      setCarregando(false);
-    }
-  };
-
-  // Abre o modal em modo criação (formulário vazio).
-  const abrirModalCriar = () => {
-    setNoEditando(null);
-    setFormNome('');
-    setFormLocalizacao('');
-    setModalVisivel(true);
-  };
-
-  // Abre o modal em modo edição (formulário preenchido com os dados do nó).
-  const abrirModalEditar = (no: NoRede) => {
-    setNoEditando(no);
-    setFormNome(no.name);
-    setFormLocalizacao(no.location);
-    setModalVisivel(true);
-  };
-
-  // CREATE / UPDATE — Decide entre criar ou atualizar baseado no estado do noEditando.
-  const salvarNo = async () => {
-    if (!formNome.trim() || !formLocalizacao.trim()) {
-      Alert.alert('Campos obrigatórios', 'Preencha o nome e a localização do nó.');
-      return;
-    }
-    try {
-      setSalvando(true);
-      if (noEditando?.id) {
-        // UPDATE: atualiza o nó existente na API.
-        const atualizado = await atualizarNo(noEditando.id, { name: formNome, location: formLocalizacao });
-        setNos((prev) => prev.map((n) => (n.id === noEditando.id ? atualizado : n)));
-        Alert.alert('Nó Atualizado', `${formNome} atualizado com sucesso.`);
-      } else {
-        // CREATE: registra novo nó na API.
-        const novo = await criarNo({ name: formNome, location: formLocalizacao, bufferedPackets: 0 });
-        setNos((prev) => [...prev, novo]);
-        Alert.alert('Nó Registrado', `${formNome} adicionado à rede DTN.`);
-      }
-      setModalVisivel(false);
-    } catch (erro) {
-      Alert.alert('Erro ao Salvar', 'Não foi possível salvar as alterações na API. Tente novamente.');
-    } finally {
-      setSalvando(false);
-    }
-  };
-
-  // DELETE — Remove o nó via API Java (com proteção do interceptor Axios para buffers).
-  const excluirNo = async (id: number) => {
-    try {
-      await deletarNo(id);
-      setNos((prev) => prev.filter((n) => n.id !== id));
-      Alert.alert('Nó Desativado', `Nó #${id} removido com sucesso da rede cislunar.`);
-    } catch (erro: any) {
-      console.log(`[NODES-JAVA] Exclusão interrompida: ${erro.message}`);
-    }
-  };
-
-  if (carregando) {
-    return (
-      <View style={styles.containerCentro}>
-        <ActivityIndicator size="large" color={COLORS.accent} />
-        <Text style={styles.textoLoading}>Consultando satélites retransmissores via API Java (1.28s)...</Text>
-        <View style={styles.skeletonCard} />
-        <View style={styles.skeletonCard} />
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.containerPrincipal}>
-      <View style={styles.glowSpotSilver1} />
-      <View style={styles.glowSpotSilver2} />
-
-      <View style={styles.containerLayout}>
-        {/* Cabeçalho com título e botão de adicionar */}
-        <View style={styles.rowHeader}>
-          <View style={styles.rowTitulo}>
-            <Ionicons name="git-network-outline" size={22} color={COLORS.textPrimary} style={styles.iconTitulo} />
-            <Text style={styles.screenTitle}>GERENCIADOR DE NÓS</Text>
-          </View>
-          <TouchableOpacity style={styles.botaoAdicionar} onPress={abrirModalCriar}>
-            <Ionicons name="add" size={20} color="#000000" />
-          </TouchableOpacity>
-        </View>
-
-        <Text style={styles.textoSubtitulo}>API Java: Spring Boot 3 · Axios · Latência 1.28s</Text>
-
-        <FlatList
-          data={nos}
-          keyExtractor={(item) => (item.id ?? Math.random()).toString()}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listaPadding}
-          renderItem={({ item }) => (
-            <View style={styles.cardNo}>
-              <View style={styles.infoCol}>
-                <View style={styles.rowNome}>
-                  <View style={[
-                    styles.ledStatus,
-                    { backgroundColor: item.bufferedPackets > 0 ? COLORS.gold : COLORS.cyan },
-                  ]} />
-                  <Text style={styles.nomeNo}>{item.name}</Text>
-                </View>
-                <Text style={styles.locNo}>Localização: {item.location}</Text>
-                <Text style={item.bufferedPackets > 0 ? styles.bufferAlerta : styles.bufferEstavel}>
-                  Buffer: {item.bufferedPackets} transações retidas
-                </Text>
-              </View>
-
-              {/* Botões de editar e excluir */}
-              <View style={styles.colBotoes}>
-                <TouchableOpacity style={styles.botaoEditar} onPress={() => abrirModalEditar(item)}>
-                  <Ionicons name="pencil-outline" size={14} color={COLORS.accent} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.botaoExcluir} onPress={() => excluirNo(item.id!)}>
-                  <Ionicons name="trash-outline" size={14} color="#000000" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-        />
-      </View>
-
-      {/* MODAL DE CRIAR / EDITAR NÓ */}
-      <Modal visible={modalVisivel} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitulo}>{noEditando ? 'EDITAR NÓ' : 'NOVO NÓ DTN'}</Text>
-
-            <Text style={styles.labelModal}>Nome do Nó:</Text>
-            <TextInput
-              style={styles.inputModal}
-              value={formNome}
-              onChangeText={setFormNome}
-              placeholder="Ex: Lunar-Gateway-Delta"
-              placeholderTextColor={COLORS.purple}
-            />
-
-            <Text style={styles.labelModal}>Localização:</Text>
-            <TextInput
-              style={styles.inputModal}
-              value={formLocalizacao}
-              onChangeText={setFormLocalizacao}
-              placeholder="Ex: LUNAR_SOUTH_POLE"
-              placeholderTextColor={COLORS.purple}
-            />
-
-            <View style={styles.rowBotoesModal}>
-              <TouchableOpacity style={styles.botaoCancelar} onPress={() => setModalVisivel(false)}>
-                <Text style={styles.textoBotaoCancelar}>CANCELAR</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.botaoSalvar} onPress={salvarNo} disabled={salvando}>
-                {salvando
-                  ? <ActivityIndicator size="small" color="#000000" />
-                  : <Text style={styles.textoBotaoSalvar}>{noEditando ? 'ATUALIZAR' : 'CRIAR'}</Text>
-                }
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  containerPrincipal: { flex: 1, backgroundColor: COLORS.background, position: 'relative' },
-  glowSpotSilver1: { position: 'absolute', width: 250, height: 250, borderRadius: 125, top: 50, left: -80, backgroundColor: COLORS.glowPurple },
-  glowSpotSilver2: { position: 'absolute', width: 300, height: 300, borderRadius: 150, top: 250, right: -100, backgroundColor: COLORS.glowPurple },
-  containerLayout: { flex: 1, paddingHorizontal: 20, paddingTop: 50 },
-  rowHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  rowTitulo: { flexDirection: 'row', alignItems: 'center' },
-  iconTitulo: { marginRight: 10 },
-  containerCentro: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background, padding: 20 },
-  textoLoading: { color: COLORS.textSecondary, fontFamily: 'DMSans-Regular', marginTop: 15, fontSize: 12, textAlign: 'center' },
-  skeletonCard: { width: '100%', height: 90, backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1, borderRadius: 12, marginVertical: 10 },
-  screenTitle: { fontSize: 20, fontFamily: 'Syne-Bold', color: COLORS.textPrimary, textTransform: 'uppercase', letterSpacing: 1.5 },
-  textoSubtitulo: { color: COLORS.purple, fontFamily: 'DMSans-Regular', fontSize: 11, marginBottom: 16 },
-  botaoAdicionar: { backgroundColor: COLORS.accent, width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  listaPadding: { paddingBottom: 90 },
-  cardNo: { backgroundColor: COLORS.glassSurface, padding: 16, borderRadius: 12, borderWidth: 1, borderColor: COLORS.glassBorder, marginVertical: 6, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  infoCol: { flex: 1, paddingRight: 10 },
-  rowNome: { flexDirection: 'row', alignItems: 'center' },
-  ledStatus: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
-  nomeNo: { color: COLORS.textPrimary, fontFamily: 'DMSans-Bold', fontSize: 13 },
-  locNo: { color: COLORS.textSecondary, fontFamily: 'DMSans-Regular', fontSize: 11, marginTop: 4 },
-  bufferEstavel: { color: COLORS.cyan, fontSize: 11, fontFamily: 'DMSans-Bold', marginTop: 6 },
-  bufferAlerta: { color: COLORS.gold, fontSize: 11, fontFamily: 'DMSans-Bold', marginTop: 6 },
-  colBotoes: { flexDirection: 'column', gap: 8 },
-  botaoEditar: { padding: 8, borderRadius: 8, borderWidth: 1, borderColor: COLORS.accent },
-  botaoExcluir: { backgroundColor: COLORS.accent, padding: 8, borderRadius: 8 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  modalCard: { width: '100%', backgroundColor: COLORS.surface, borderRadius: 16, padding: 24, borderWidth: 1, borderColor: COLORS.glassBorder },
-  modalTitulo: { fontSize: 14, fontFamily: 'Syne-Bold', color: COLORS.textPrimary, letterSpacing: 1.5, marginBottom: 20 },
-  labelModal: { color: COLORS.textSecondary, fontFamily: 'DMSans-Medium', fontSize: 11, marginBottom: 6 },
-  inputModal: { backgroundColor: '#05070d', color: COLORS.textPrimary, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border, fontSize: 13, fontFamily: 'DMSans-Regular', marginBottom: 16 },
-  rowBotoesModal: { flexDirection: 'row', gap: 12, marginTop: 4 },
-  botaoCancelar: { flex: 1, paddingVertical: 14, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center' },
-  textoBotaoCancelar: { color: COLORS.textSecondary, fontFamily: 'DMSans-Bold', fontSize: 12 },
-  botaoSalvar: { flex: 1, paddingVertical: 14, borderRadius: 8, backgroundColor: COLORS.accent, alignItems: 'center' },
-  textoBotaoSalvar: { color: '#000000', fontFamily: 'DMSans-Bold', fontSize: 12 },
-});
+import React, { useState, useEffect } from 'react';import {  StyleSheet, Text, View, FlatList, TouchableOpacity,  ActivityIndicator, Alert, TextInput, Modal,} from 'react-native';import { Ionicons } from '@expo/vector-icons';import { COLORS } from '../../constants/Colors';import { buscarNos, criarNo, atualizarNo, deletarNo, NoRede } from '../../services/nodesJavaApi';export default function NodesScreen() {  const [nos, setNos] = useState<NoRede[]>([]);  const [carregando, setCarregando] = useState(true);  const [modalVisivel, setModalVisivel] = useState(false);  const [noEditando, setNoEditando] = useState<NoRede | null>(null);  const [formNome, setFormNome] = useState('');  const [formLocalizacao, setFormLocalizacao] = useState('');  const [salvando, setSalvando] = useState(false);  useEffect(() => {    carregarNos();  }, []);  const carregarNos = async () => {    try {      setCarregando(true);      const lista = await buscarNos();      setNos(lista);    } catch (erro) {      Alert.alert('Erro de Conexão', 'Não foi possível conectar à API Java. Verifique o IP do gateway na tela de Configurações.');      setNos([        { id: 1, name: 'Terrestrial-Gateway-01', location: 'EARTH_KSC', bufferedPackets: 0 },        { id: 2, name: 'Lunar-Gateway-Alpha', location: 'LUNAR_SOUTH_POLE', bufferedPackets: 0 },        { id: 3, name: 'Lunar-Gateway-Beta', location: 'LUNAR_EQUATOR', bufferedPackets: 15 },        { id: 4, name: 'Lunar-Orbiter-Satt-1', location: 'LUNAR_ORBIT', bufferedPackets: 0 },      ]);    } finally {      setCarregando(false);    }  };  const abrirModalCriar = () => {    setNoEditando(null);    setFormNome('');    setFormLocalizacao('');    setModalVisivel(true);  };  const abrirModalEditar = (no: NoRede) => {    setNoEditando(no);    setFormNome(no.name);    setFormLocalizacao(no.location);    setModalVisivel(true);  };  const salvarNo = async () => {    if (!formNome.trim() || !formLocalizacao.trim()) {      Alert.alert('Campos obrigatórios', 'Preencha o nome e a localização do nó.');      return;    }    try {      setSalvando(true);      if (noEditando?.id) {        const atualizado = await atualizarNo(noEditando.id, { name: formNome, location: formLocalizacao });        setNos((prev) => prev.map((n) => (n.id === noEditando.id ? atualizado : n)));        Alert.alert('Nó Atualizado', `${formNome} atualizado com sucesso.`);      } else {        const novo = await criarNo({ name: formNome, location: formLocalizacao, bufferedPackets: 0 });        setNos((prev) => [...prev, novo]);        Alert.alert('Nó Registrado', `${formNome} adicionado à rede DTN.`);      }      setModalVisivel(false);    } catch (erro) {      Alert.alert('Erro ao Salvar', 'Não foi possível salvar as alterações na API. Tente novamente.');    } finally {      setSalvando(false);    }  };  const excluirNo = async (id: number) => {    try {      await deletarNo(id);      setNos((prev) => prev.filter((n) => n.id !== id));      Alert.alert('Nó Desativado', `Nó #${id} removido com sucesso da rede cislunar.`);    } catch (erro: any) {      console.log(`[NODES-JAVA] Exclusão interrompida: ${erro.message}`);    }  };  if (carregando) {    return (      <View style={styles.containerCentro}>        <ActivityIndicator size="large" color={COLORS.accent} />        <Text style={styles.textoLoading}>Consultando satélites retransmissores via API Java (1.28s)...</Text>        <View style={styles.skeletonCard} />        <View style={styles.skeletonCard} />      </View>    );  }  return (    <View style={styles.containerPrincipal}>      <View style={styles.glowSpotSilver1} />      <View style={styles.glowSpotSilver2} />      <View style={styles.containerLayout}>        <View style={styles.rowHeader}>          <View style={styles.rowTitulo}>            <Ionicons name="git-network-outline" size={22} color={COLORS.textPrimary} style={styles.iconTitulo} />            <Text style={styles.screenTitle}>GERENCIADOR DE NÓS</Text>          </View>          <TouchableOpacity style={styles.botaoAdicionar} onPress={abrirModalCriar}>            <Ionicons name="add" size={20} color="#000000" />          </TouchableOpacity>        </View>        <Text style={styles.textoSubtitulo}>API Java: Spring Boot 3 · Axios · Latência 1.28s</Text>        <FlatList          data={nos}          keyExtractor={(item) => (item.id ?? Math.random()).toString()}          showsVerticalScrollIndicator={false}          contentContainerStyle={styles.listaPadding}          renderItem={({ item }) => (            <View style={styles.cardNo}>              <View style={styles.infoCol}>                <View style={styles.rowNome}>                  <View style={[                    styles.ledStatus,                    { backgroundColor: item.bufferedPackets > 0 ? COLORS.gold : COLORS.cyan },                  ]} />                  <Text style={styles.nomeNo}>{item.name}</Text>                </View>                <Text style={styles.locNo}>Localização: {item.location}</Text>                <Text style={item.bufferedPackets > 0 ? styles.bufferAlerta : styles.bufferEstavel}>                  Buffer: {item.bufferedPackets} transações retidas                </Text>              </View>              <View style={styles.colBotoes}>                <TouchableOpacity style={styles.botaoEditar} onPress={() => abrirModalEditar(item)}>                  <Ionicons name="pencil-outline" size={14} color={COLORS.accent} />                </TouchableOpacity>                <TouchableOpacity style={styles.botaoExcluir} onPress={() => excluirNo(item.id!)}>                  <Ionicons name="trash-outline" size={14} color="#000000" />                </TouchableOpacity>              </View>            </View>          )}        />      </View>      <Modal visible={modalVisivel} transparent animationType="fade">        <View style={styles.modalOverlay}>          <View style={styles.modalCard}>            <Text style={styles.modalTitulo}>{noEditando ? 'EDITAR NÓ' : 'NOVO NÓ DTN'}</Text>            <Text style={styles.labelModal}>Nome do Nó:</Text>            <TextInput              style={styles.inputModal}              value={formNome}              onChangeText={setFormNome}              placeholder="Ex: Lunar-Gateway-Delta"              placeholderTextColor={COLORS.purple}            />            <Text style={styles.labelModal}>Localização:</Text>            <TextInput              style={styles.inputModal}              value={formLocalizacao}              onChangeText={setFormLocalizacao}              placeholder="Ex: LUNAR_SOUTH_POLE"              placeholderTextColor={COLORS.purple}            />            <View style={styles.rowBotoesModal}>              <TouchableOpacity style={styles.botaoCancelar} onPress={() => setModalVisivel(false)}>                <Text style={styles.textoBotaoCancelar}>CANCELAR</Text>              </TouchableOpacity>              <TouchableOpacity style={styles.botaoSalvar} onPress={salvarNo} disabled={salvando}>                {salvando                  ? <ActivityIndicator size="small" color="#000000" />                  : <Text style={styles.textoBotaoSalvar}>{noEditando ? 'ATUALIZAR' : 'CRIAR'}</Text>                }              </TouchableOpacity>            </View>          </View>        </View>      </Modal>    </View>  );}const styles = StyleSheet.create({  containerPrincipal: { flex: 1, backgroundColor: COLORS.background, position: 'relative' },  glowSpotSilver1: { position: 'absolute', width: 250, height: 250, borderRadius: 125, top: 50, left: -80, backgroundColor: COLORS.glowPurple },  glowSpotSilver2: { position: 'absolute', width: 300, height: 300, borderRadius: 150, top: 250, right: -100, backgroundColor: COLORS.glowPurple },  containerLayout: { flex: 1, paddingHorizontal: 20, paddingTop: 50 },  rowHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },  rowTitulo: { flexDirection: 'row', alignItems: 'center' },  iconTitulo: { marginRight: 10 },  containerCentro: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background, padding: 20 },  textoLoading: { color: COLORS.textSecondary, fontFamily: 'DMSans-Regular', marginTop: 15, fontSize: 12, textAlign: 'center' },  skeletonCard: { width: '100%', height: 90, backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1, borderRadius: 12, marginVertical: 10 },  screenTitle: { fontSize: 20, fontFamily: 'Syne-Bold', color: COLORS.textPrimary, textTransform: 'uppercase', letterSpacing: 1.5 },  textoSubtitulo: { color: COLORS.purple, fontFamily: 'DMSans-Regular', fontSize: 11, marginBottom: 16 },  botaoAdicionar: { backgroundColor: COLORS.accent, width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },  listaPadding: { paddingBottom: 90 },  cardNo: { backgroundColor: COLORS.glassSurface, padding: 16, borderRadius: 12, borderWidth: 1, borderColor: COLORS.glassBorder, marginVertical: 6, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },  infoCol: { flex: 1, paddingRight: 10 },  rowNome: { flexDirection: 'row', alignItems: 'center' },  ledStatus: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },  nomeNo: { color: COLORS.textPrimary, fontFamily: 'DMSans-Bold', fontSize: 13 },  locNo: { color: COLORS.textSecondary, fontFamily: 'DMSans-Regular', fontSize: 11, marginTop: 4 },  bufferEstavel: { color: COLORS.cyan, fontSize: 11, fontFamily: 'DMSans-Bold', marginTop: 6 },  bufferAlerta: { color: COLORS.gold, fontSize: 11, fontFamily: 'DMSans-Bold', marginTop: 6 },  colBotoes: { flexDirection: 'column', gap: 8 },  botaoEditar: { padding: 8, borderRadius: 8, borderWidth: 1, borderColor: COLORS.accent },  botaoExcluir: { backgroundColor: COLORS.accent, padding: 8, borderRadius: 8 },  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center', padding: 24 },  modalCard: { width: '100%', backgroundColor: COLORS.surface, borderRadius: 16, padding: 24, borderWidth: 1, borderColor: COLORS.glassBorder },  modalTitulo: { fontSize: 14, fontFamily: 'Syne-Bold', color: COLORS.textPrimary, letterSpacing: 1.5, marginBottom: 20 },  labelModal: { color: COLORS.textSecondary, fontFamily: 'DMSans-Medium', fontSize: 11, marginBottom: 6 },  inputModal: { backgroundColor: '#05070d', color: COLORS.textPrimary, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border, fontSize: 13, fontFamily: 'DMSans-Regular', marginBottom: 16 },  rowBotoesModal: { flexDirection: 'row', gap: 12, marginTop: 4 },  botaoCancelar: { flex: 1, paddingVertical: 14, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center' },  textoBotaoCancelar: { color: COLORS.textSecondary, fontFamily: 'DMSans-Bold', fontSize: 12 },  botaoSalvar: { flex: 1, paddingVertical: 14, borderRadius: 8, backgroundColor: COLORS.accent, alignItems: 'center' },  textoBotaoSalvar: { color: '#000000', fontFamily: 'DMSans-Bold', fontSize: 12 },});

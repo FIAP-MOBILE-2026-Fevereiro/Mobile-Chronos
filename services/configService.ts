@@ -10,7 +10,7 @@ const CHAVE_IP_GATEWAY = '@chronos:ipGateway';
 const CHAVE_BACKEND = '@chronos:backendAtivo';
 
 // Valores padrão de fábrica.
-export const IP_PADRAO = '192.168.1.100';
+export const IP_PADRAO = '10.0.2.2';
 export const BACKEND_PADRAO: 'java' | 'dotnet' = 'java';
 
 // ========================================================================================
@@ -24,8 +24,8 @@ export async function salvarIpGateway(ip: string): Promise<void> {
 // CARREGAR — Recupera o IP do gateway salvo (retorna o padrão se não houver).
 // ========================================================================================
 export async function carregarIpGateway(): Promise<string> {
-  const ip = await AsyncStorage.getItem(CHAVE_IP_GATEWAY);
-  return ip ?? IP_PADRAO;
+  // Ignorando IP salvo e forçando 10.0.2.2 para destravar o aplicativo no emulador
+  return '10.0.2.2';
 }
 
 // ========================================================================================
